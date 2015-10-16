@@ -15,7 +15,6 @@
 #include <pcl/filters/radius_outlier_removal.h>
 #include <pcl/common/common.h>
 #include <pcl/common/centroid.h>
-#include <pcl/filters/radius_outlier_removal.h>
 #include <std_msgs/Float64.h>
 
 geometry_msgs::Twist twist;

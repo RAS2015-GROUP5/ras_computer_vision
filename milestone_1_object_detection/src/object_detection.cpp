@@ -1,5 +1,4 @@
 #include "ros/ros.h"
-#include "ros/ros.h";
 #include <sensor_msgs/PointCloud2.h>
 #include <pcl_conversions/pcl_conversions.h>
 #include <pcl/point_cloud.h>
@@ -25,10 +24,6 @@ pcl::SACSegmentation<pcl::PointXYZ> seg;
 pcl::search::KdTree<pcl::PointXYZ>::Ptr tree (new pcl::search::KdTree<pcl::PointXYZ>);
 pcl::EuclideanClusterExtraction<pcl::PointXYZ> ec;
 
-void depthPointsCallback(const sensor_msgs::PointCloud2ConstPtr& cloud_msg) {
-
-ros::Publisher downsample_pub;
-ros::Subscriber depth_sub;
 
 void depthPointsCallback(const sensor_msgs::PointCloud2ConstPtr& cloud_msg) {
 
@@ -42,9 +37,7 @@ void depthPointsCallback(const sensor_msgs::PointCloud2ConstPtr& cloud_msg) {
 
     // Apply Voxel Filter on PCLPointCloud2
     vox.setInputCloud (cloudPtr);
-    pcl::VoxelGrid<pcl::PCLPointCloud2> vox;
     vox.setInputCloud (cloudPtr);
-    vox.setLeafSize (0.025, 0.025, 0.025);
     vox.filter (*cloud_intermediate);
 
     // Convert PCL::PointCloud2 to PCL::PointCloud<PointXYZ>
@@ -61,8 +54,6 @@ void depthPointsCallback(const sensor_msgs::PointCloud2ConstPtr& cloud_msg) {
     // Apply Passthrough Filter
     pass.setFilterFieldName ("x");
     pass.setFilterLimits (-0.2, 0.2);
-    pass.setInputCloud (cloud_p);
-    pcl::PassThrough<pcl::PointXYZ> pass;
     pass.setInputCloud (cloud_p);
     pass.setFilterFieldName ("z");
     pass.setFilterLimits (0.0, 3.0);
@@ -83,14 +74,8 @@ void depthPointsCallback(const sensor_msgs::PointCloud2ConstPtr& cloud_msg) {
     seg.setEpsAngle(  30.0f * (3.14f/180.0f) );
     seg.setAxis(lol);
     //while(cloud_p->points.size () > 0.2 * nr_points) {
-    pcl::StatisticalOutlierRemoval<pcl::PointXYZ> sor;
     sor.setInputCloud (cloud_p);
-    sor.setMeanK (5);
-    sor.setStddevMulThresh (0.05);
     sor.filter (*cloud_p);
-
-    pcl::ModelCoefficients::Ptr coefficients (new pcl::ModelCoefficients);
-    pcl::PointIndices::Ptr inliers (new pcl::PointIndices);
     // Create the segmentation object
     pcl::SACSegmentation<pcl::PointXYZ> seg;
     // Optional
@@ -156,14 +141,6 @@ void depthPointsCallback(const sensor_msgs::PointCloud2ConstPtr& cloud_msg) {
         std::cout << "Clusters detected: " << cluster_indices.size() << "\n";
         // Convert to ROS data type
     }
-
-    ROS_INFO("Inliers: %i", inliers->indices.size());
-    if (inliers->indices.size () == 0)
-    {
-      PCL_ERROR ("Could not estimate a planar model for the given dataset.");
-      return (-1);
-    }
-
     // Convert to ROS data type
     sensor_msgs::PointCloud2 output;
     pcl::toROSMsg(*cloud_p, output);

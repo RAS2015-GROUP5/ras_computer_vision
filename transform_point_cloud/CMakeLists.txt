@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 2.8.3)
-project(milestone_1_object_detection)
+project(transform_point_cloud)
 
 ## Find catkin macros and libraries
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
@@ -8,8 +8,8 @@ find_package(catkin REQUIRED COMPONENTS
   roscpp
   rospy
   std_msgs
-  pcl_conversions
-  pcl_ros
+	pcl_conversions
+	pcl_ros
 )
 
 ## System dependencies are found with CMake's conventions
@@ -69,7 +69,7 @@ find_package(catkin REQUIRED COMPONENTS
 ## Generate added messages and services with any dependencies listed here
 # generate_messages(
 #   DEPENDENCIES
-#   std_msgs
+#   std_msgs  # Or other packages containing msgs
 # )
 
 ################################################
@@ -103,8 +103,8 @@ find_package(catkin REQUIRED COMPONENTS
 ## DEPENDS: system dependencies of this project that dependent projects also need
 catkin_package(
 #  INCLUDE_DIRS include
-#  LIBRARIES milestone_0_follow_object
-#  CATKIN_DEPENDS roscpp rospy std_msgs
+#  LIBRARIES transform_point_cloud
+#  CATKIN_DEPENDS other_catkin_pkg
 #  DEPENDS system_lib
 )
 
@@ -115,29 +115,26 @@ catkin_package(
 ## Specify additional locations of header files
 ## Your package locations should be listed before other locations
 # include_directories(include)
-include_directories(
-  ${catkin_INCLUDE_DIRS}
-)
 
 ## Declare a C++ library
-# add_library(milestone_0_follow_object
-#   src/${PROJECT_NAME}/milestone_0_follow_object.cpp
+# add_library(transform_point_cloud
+#   src/${PROJECT_NAME}/transform_point_cloud.cpp
 # )
 
 ## Add cmake target dependencies of the library
 ## as an example, code may need to be generated before libraries
 ## either from message generation or dynamic reconfigure
-# add_dependencies(milestone_0_follow_object ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+# add_dependencies(transform_point_cloud ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
 ## Declare a C++ executable
-# add_executable(milestone_0_follow_object_node src/milestone_0_follow_object_node.cpp)
+# add_executable(transform_point_cloud_node src/transform_point_cloud_node.cpp)
 
 ## Add cmake target dependencies of the executable
 ## same as for the library above
-# add_dependencies(milestone_0_follow_object_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+# add_dependencies(transform_point_cloud_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
 ## Specify libraries to link a library or executable target against
-# target_link_libraries(milestone_0_follow_object_node
+# target_link_libraries(transform_point_cloud_node
 #   ${catkin_LIBRARIES}
 # )
 
@@ -156,7 +153,7 @@ include_directories(
 # )
 
 ## Mark executables and/or libraries for installation
-# install(TARGETS milestone_0_follow_object milestone_0_follow_object_node
+# install(TARGETS transform_point_cloud transform_point_cloud_node
 #   ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
 #   LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
 #   RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
@@ -181,15 +178,17 @@ include_directories(
 #############
 
 ## Add gtest based cpp test target and link libraries
-# catkin_add_gtest(${PROJECT_NAME}-test test/test_milestone_0_follow_object.cpp)
+# catkin_add_gtest(${PROJECT_NAME}-test test/test_transform_point_cloud.cpp)
 # if(TARGET ${PROJECT_NAME}-test)
 #   target_link_libraries(${PROJECT_NAME}-test ${PROJECT_NAME})
 # endif()
 
 ## Add folders to be run by python nosetests
 # catkin_add_nosetests(test)
-add_executable(planar_segmentation src/object_detection.cpp)
-target_link_libraries(planar_segmentation ${catkin_LIBRARIES})
 
-add_executable(plane_segmentation src/plane_segmentation.cpp)
-target_link_libraries(plane_segmentation ${catkin_LIBRARIES})
+include_directories(
+  ${catkin_INCLUDE_DIRS}
+)
+
+add_executable(transform_pointcloud src/transform_pointcloud.cpp)
+target_link_libraries(transform_pointcloud ${catkin_LIBRARIES})

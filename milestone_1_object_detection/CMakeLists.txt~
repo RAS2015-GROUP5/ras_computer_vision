@@ -8,8 +8,8 @@ find_package(catkin REQUIRED COMPONENTS
   roscpp
   rospy
   std_msgs
-	pcl_conversions
-	pcl_ros
+  pcl_conversions
+  pcl_ros
 )
 
 ## System dependencies are found with CMake's conventions
@@ -188,5 +188,8 @@ include_directories(
 
 ## Add folders to be run by python nosetests
 # catkin_add_nosetests(test)
-add_executable(planar_segmentation src/follow_closest_object.cpp)
+add_executable(planar_segmentation src/object_detection.cpp)
 target_link_libraries(planar_segmentation ${catkin_LIBRARIES})
+
+add_executable(plane_segmentation src/plane_segmentation.cpp)
+target_link_libraries(plane_segmentation ${catkin_LIBRARIES})
