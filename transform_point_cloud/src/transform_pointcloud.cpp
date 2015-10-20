@@ -27,51 +27,78 @@
 
 #include <pcl/common/transforms.h>
 
+#include <math.h>
+
 ros::Subscriber pointcloud_sub;
 ros::Publisher downsample_pub;
-pcl::VoxelGrid<pcl::PCLPointCloud2> vox;
-pcl::PassThrough<pcl::PointXYZ> pass;
-pcl::StatisticalOutlierRemoval<pcl::PointXYZ> sor;
+pcl::VoxelGrid<pcl::PointXYZRGB> vox;
+pcl::PassThrough<pcl::PointXYZRGB> pass;
+pcl::StatisticalOutlierRemoval<pcl::PointXYZRGB> sor;
+
+pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud (new pcl::PointCloud<pcl::PointXYZRGB>);
+pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_f (new pcl::PointCloud<pcl::PointXYZRGB>);
+pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_floor (new pcl::PointCloud<pcl::PointXYZRGB>);
+
+float primeSenseAngle = -0.523599;
+bool floorIsFound = false;
 
 void cloudCallback(const sensor_msgs::PointCloud2ConstPtr& cloud_msg) {
     // Instantiate various clouds
-    pcl::PCLPointCloud2* cloud_intermediate = new pcl::PCLPointCloud2;
-    pcl::PCLPointCloud2ConstPtr cloudPtr(cloud_intermediate);
-    pcl::PointCloud<pcl::PointXYZ> cloud;
-
-    // Convert to PCL data type
-    pcl_conversions::toPCL(*cloud_msg, *cloud_intermediate);
+    pcl::fromROSMsg (*cloud_msg, *cloud);
 
     // Apply Voxel Filter on PCLPointCloud2
-    vox.setInputCloud (cloudPtr);
-    vox.setInputCloud (cloudPtr);
-    vox.filter (*cloud_intermediate);
-
-    // Convert PCL::PointCloud2 to PCL::PointCloud<PointXYZ>
-    pcl::fromPCLPointCloud2(*cloud_intermediate, cloud);
-    pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_p = cloud.makeShared();
+    vox.setInputCloud (cloud);
+    vox.filter (*cloud_f);
 
     // Apply Passthrough Filter
-    /*pass.setFilterFieldName ("x");
-    pass.setFilterLimits (-1, 1);*/
-    pass.setInputCloud (cloud_p);
+    pass.setInputCloud (cloud_f);
     pass.setFilterFieldName ("z");
     pass.setFilterLimits (0.0, 3.0);
-    //pass.setFilterLimitsNegative (true);
-    pass.filter (*cloud_p);
+    pass.filter(*cloud_f);
+    pass.setInputCloud (cloud_f);
+    pass.setFilterFieldName ("x");
+    pass.setFilterLimits (-0.085, 0.085);
+    pass.filter (*cloud_f);
+
+    //Extract floor plane
+   /* pass.setInputCloud(cloud_f);
+    pass.setFilterFieldName("y");
+    pass.setFilterLimits(-0.3, 0.25);
+    pass.filter(cloud_floor);*/
 
     // Apply Statistical Noise Filter
-    sor.setInputCloud (cloud_p);
-    sor.filter (*cloud_p);
+    sor.setInputCloud (cloud_f);
+    sor.filter (*cloud_f);
 
-    float theta = -1.5708;
+    if(!floorIsFound) {
+        pcl::ModelCoefficients::Ptr coefficients (new pcl::ModelCoefficients);
+        pcl::PointIndices::Ptr inliers (new pcl::PointIndices);
+        // Create the segmentation object
+        pcl::SACSegmentation<pcl::PointXYZRGB> seg;
+        // Optional
+        seg.setOptimizeCoefficients (true);
+        // Mandatory
+        seg.setModelType (pcl::SACMODEL_PLANE);
+        seg.setMethodType (pcl::SAC_RANSAC);
+        seg.setDistanceThreshold (0.01);
+
+        seg.setInputCloud (cloud_f);
+        seg.segment (*inliers, *coefficients);
+        std::cout << coefficients->values[0] << " " << coefficients->values[1] << " " << coefficients->values[2] << "\n";
+        Eigen::Vector3f floor_normal (coefficients->values[0], coefficients->values[1], coefficients->values[2]);
+        primeSenseAngle = -acos(Eigen::Vector3f(0.0,0.0,1.0).dot(floor_normal));
+        //floorIsFound = true;
+        ROS_INFO("primeSenseAngle: %f", primeSenseAngle);
+    }
+
+    // Transform pointcloud to world coordinates
     Eigen::Affine3f transform = Eigen::Affine3f::Identity();
-    transform.rotate (Eigen::AngleAxisf (theta, Eigen::Vector3f::UnitX()));
-    pcl::transformPointCloud (*cloud_p, *cloud_p, transform);
+    transform.rotate (Eigen::AngleAxisf (primeSenseAngle, Eigen::Vector3f::UnitX()));
+    pcl::transformPointCloud (*cloud_f, *cloud_f, transform);
+    pcl::transformPointCloud (*cloud, *cloud, transform);
 
     sensor_msgs::PointCloud2 output;
-    pcl::toROSMsg(*cloud_p, output);
-
+    pcl::toROSMsg(*cloud_f, output);
 
     // Publish the data
     downsample_pub.publish(output);
@@ -81,13 +108,13 @@ int main(int argc, char** argv) {
     ros::init(argc, argv, "transform");
     ros::NodeHandle n;
 
-    vox.setLeafSize (0.05, 0.05, 0.05);
+    vox.setLeafSize (0.01, 0.01, 0.01);
 
     sor.setMeanK (10);
     sor.setStddevMulThresh (0.1);
 
     downsample_pub = n.advertise<sensor_msgs::PointCloud2>("/downsample",10);
-    pointcloud_sub = n.subscribe("/camera/depth/points",1, cloudCallback);
+    pointcloud_sub = n.subscribe("/camera/depth_registered/points",1, cloudCallback);
     ros::Rate loop_rate(10);
     while(ros::ok()) {
         ros::spinOnce();

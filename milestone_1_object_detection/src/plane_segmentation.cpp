@@ -38,7 +38,7 @@ void cloudCallback(const sensor_msgs::PointCloud2ConstPtr& cloud_msg) {
     pcl::VoxelGrid<pcl::PointXYZRGB> vg;
     pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_filtered (new pcl::PointCloud<pcl::PointXYZRGB>);
     vg.setInputCloud (cloud);
-    vg.setLeafSize (0.01f, 0.01f, 0.01f);
+    vg.setLeafSize (0.001f, 0.001f, 0.001f);
     vg.filter (*cloud_filtered);
     std::cout << "PointCloud after filtering has: " << cloud_filtered->points.size ()  << " data points." << std::endl; //*
 
@@ -50,12 +50,12 @@ void cloudCallback(const sensor_msgs::PointCloud2ConstPtr& cloud_msg) {
     seg.setOptimizeCoefficients (true);
     seg.setModelType (pcl::SACMODEL_PLANE);
     seg.setMethodType (pcl::SAC_RANSAC);
-    seg.setMaxIterations (100);
-    seg.setDistanceThreshold (0.02);
+    seg.setMaxIterations (50);
+    seg.setDistanceThreshold (0.01);
 
     int i=0, nr_points = (int) cloud_filtered->points.size ();
 
-    while (cloud_filtered->points.size () > 0.30 * nr_points)
+    while (cloud_filtered->points.size () > 0.2 * nr_points)
     {
         // Segment the largest planar component from the remaining cloud
         seg.setInputCloud (cloud_filtered);
