@@ -68,6 +68,7 @@ void imageCallback(const sensor_msgs::ImageConstPtr& msg) {
     cv::imshow("RED OBJECTS", imgThresholded); //show the thresholded image
     cv::waitKey(1);
 
+    /*
     // ORANGE OBJECTS
     cv::inRange(imgHSV,  cv::Scalar(OLowH, 135, 135), cv::Scalar(OHighH, 255, 255), imgThresholded); //Threshold the image
     //morphological opening (remove small objects from the foreground)
@@ -127,6 +128,7 @@ void imageCallback(const sensor_msgs::ImageConstPtr& msg) {
     cv::erode(imgThresholded, imgThresholded, getStructuringElement(MORPH_ELLIPSE, Size(8, 1)) );
     cv::imshow("VIOLET OBJECTS", imgThresholded); //show the thresholded image
     cv::waitKey(1);
+    */
 
 
 }
@@ -161,7 +163,9 @@ int main( int argc, char** argv )
     image_sub = n.subscribe("/camera/rgb/image_raw", 1, imageCallback);
 
     ros::Rate loop_rate(1000);
-
+    namedWindow( "Parameters", CV_WINDOW_AUTOSIZE );
+    createTrackbar("Rlow", "Parameters", &RLowH, 255, NULL);
+    createTrackbar("Rhigh", "Parameters", &RHighH, 255, NULL);
     while(ros::ok()) {
         ros::spinOnce();
         loop_rate.sleep();

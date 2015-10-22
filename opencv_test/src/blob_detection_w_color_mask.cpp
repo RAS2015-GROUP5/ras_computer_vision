@@ -11,6 +11,7 @@ using namespace cv;
 
 ros::Subscriber image_sub;
 Mat imgHSV;
+Mat img;
 SimpleBlobDetector::Params params;
 cv::SimpleBlobDetector detector;
 
@@ -28,6 +29,8 @@ int min_circ = 100;
 int max_circ = 1000;
 int col_fil = 0;
 
+int RLowH = 160;
+int RHighH = 179;
 
 void imageCallback(const sensor_msgs::ImageConstPtr& msg) {
     //Convert from the ROS image message to a CvImage suitable for working with OpenCV for processing
@@ -47,13 +50,23 @@ void imageCallback(const sensor_msgs::ImageConstPtr& msg) {
         return;
     }
 
-    //cv::cvtColor(cv_ptr->image, imgHSV, COLOR_BGR2HSV);
-    imgHSV = cv_ptr->image;
+    img = cv_ptr->image;
 
 
     //for ( int i = 1; i < g_sigma; i = i + 2 ){
     //}
+    cv::cvtColor(img, imgHSV, COLOR_BGR2HSV);
 
+    //RED OBJECTS
+
+    cv::inRange(imgHSV,  cv::Scalar(RLowH, 135, 135), cv::Scalar(RHighH, 255, 255), imgHSV); //Threshold the image
+    //morphological opening (remove small objects from the foreground)
+    cv::erode(imgHSV, imgHSV, getStructuringElement(MORPH_ELLIPSE, Size(8, 8)));
+    cv::dilate( imgHSV, imgHSV, getStructuringElement(MORPH_ELLIPSE, Size(8,8)));
+
+    //morphological closing (fill small holes in the foreground)
+    cv::dilate(imgHSV, imgHSV, getStructuringElement(MORPH_ELLIPSE, Size(8, 1)) );
+    cv::erode(imgHSV, imgHSV, getStructuringElement(MORPH_ELLIPSE, Size(8, 1)) );
     imgSet = true;
 }
 
@@ -67,7 +80,6 @@ int main(int argc, char** argv) {
 
     createTrackbar("Gaussian Blur sigma", "Settings", &g_sigma, 100, NULL);
     createTrackbar("Gaussian Blur size", "Settings", &g_size, 100, NULL);
-    createTrackbar("Color filter", "Settings", &col_fil, 255, NULL); //Does not work?
     createTrackbar("Min size", "Settings", &min_size, 10000, NULL);
     createTrackbar("Max size", "Settings", &max_size, 10000, NULL);
     createTrackbar("Min Inertia", "Settings", &min_inert, 1000, NULL);
@@ -82,7 +94,7 @@ int main(int argc, char** argv) {
         ros::spinOnce();
 
         params.filterByColor = true;
-        params.blobColor = col_fil;
+        //params.blobColor = col_fil;
         params.filterByArea = true;
         params.minArea = min_size + 100;
         params.maxArea = max_size + 100;
@@ -93,24 +105,31 @@ int main(int argc, char** argv) {
         params.maxThreshold = max_thres;
         params.minCircularity = (float) min_circ/1000.0;
         params.maxCircularity = (float) max_circ/1000.0;
-
+        RNG rng(12345);
         // Detect blobs.
         if(imgSet) {
+            vector<vector<Point> > contours;
+            vector<Vec4i> hierarchy;
             GaussianBlur( imgHSV, imgHSV, Size(2*g_size+1, 2*g_size+1), g_sigma, 0 );
-            std::vector<KeyPoint> keypoints;
-            SimpleBlobDetector detector(params);
-            detector.detect( imgHSV, keypoints);
 
-            // Draw detected blobs as red circles.
-            // DrawMatchesFlags::DRAW_RICH_KEYPOINTS flag ensures the size of the circle corresponds to the size of blob
-            Mat im_with_keypoints;
-            drawKeypoints( imgHSV, keypoints, im_with_keypoints, Scalar(0,0,255), DrawMatchesFlags::DRAW_RICH_KEYPOINTS );
-
-            // Show blobs
-            imshow("keypoints", im_with_keypoints);
+            findContours( imgHSV, contours, hierarchy, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE, Point(0, 0) );
+            vector<Rect> boundRect( contours.size() );
+            vector<vector<Point> > contours_poly( contours.size() );
+            for( int i = 0; i < contours.size(); i++ ) {
+                approxPolyDP( Mat(contours[i]), contours_poly[i], 3, true );
+                boundRect[i] = boundingRect( Mat(contours_poly[i]) );
+            }
+            for( int i = 0; i< contours.size(); i++ )
+            {
+                Scalar color = Scalar( rng.uniform(0, 255), rng.uniform(0,255), rng.uniform(0,255) );
+                rectangle( img, boundRect[i].tl(), boundRect[i].br(), color, 2, 8, 0 );
+                imshow("Obj " + i, img(boundRect[i]));
+            }
+            imshow("keypoints", img);
             waitKey(3);
         }
         loop_rate.sleep();
     }
     return 0;
 }
+
