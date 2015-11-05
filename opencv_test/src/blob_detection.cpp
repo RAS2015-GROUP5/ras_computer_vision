@@ -67,7 +67,7 @@ int main(int argc, char** argv) {
 
     createTrackbar("Gaussian Blur sigma", "Settings", &g_sigma, 100, NULL);
     createTrackbar("Gaussian Blur size", "Settings", &g_size, 100, NULL);
-    createTrackbar("Color filter", "Settings", &col_fil, 255, NULL); //Does not work?
+    //createTrackbar("Color filter", "Settings", &col_fil, 255, NULL); //Does not work?
     createTrackbar("Min size", "Settings", &min_size, 10000, NULL);
     createTrackbar("Max size", "Settings", &max_size, 10000, NULL);
     createTrackbar("Min Inertia", "Settings", &min_inert, 1000, NULL);
@@ -81,8 +81,8 @@ int main(int argc, char** argv) {
     while(ros::ok()) {
         ros::spinOnce();
 
-        params.filterByColor = true;
-        params.blobColor = col_fil;
+        //params.filterByColor = true;
+        //params.blobColor = col_fil;
         params.filterByArea = true;
         params.minArea = min_size + 100;
         params.maxArea = max_size + 100;

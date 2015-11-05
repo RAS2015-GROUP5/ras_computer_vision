@@ -7,30 +7,36 @@
 #include <cv_bridge/cv_bridge.h>
 #include <sensor_msgs/image_encodings.h>
 
+#include <opencv2/features2d/features2d.hpp>
+
 using namespace cv;
 
 ros::Subscriber image_sub;
 Mat imgHSV;
 Mat img;
-SimpleBlobDetector::Params params;
-cv::SimpleBlobDetector detector;
 
+FlannBasedMatcher matcher;
+//BFMatcher matcher(NORM_L2);
+//Ptr<DescriptorExtractor> extractor = cv::DescriptorExtractor::create("ORB");
+
+OrbFeatureDetector      orb(700,1.2f,8,8,0,2,0,14);   //> (From 31 to 14)
+OrbDescriptorExtractor extractor(700,1.2f,8,8,0,2,0,14);
+
+//orbFeatureDetector orb(700, 1.2f, 8, 8, 0, 2, ORB::HARRIS_SCORE, 31);
+Mat rect_img;
 bool imgSet = false;
 
 int g_sigma = 6;
 int g_size = 6;
-int min_size = 0;
-int max_size = 10000;
-int min_inert = 100;
-int max_inert = 1000;
-int min_thres = 100;
-int max_thres = 1000;
-int min_circ = 100;
-int max_circ = 1000;
-int col_fil = 0;
 
 int RLowH = 160;
 int RHighH = 179;
+
+int scale = 1;
+int delta = 0;
+int ddepth = CV_16S;
+int f_threshold = 50;
+int maxGoodDistance = 100000;
 
 void imageCallback(const sensor_msgs::ImageConstPtr& msg) {
     //Convert from the ROS image message to a CvImage suitable for working with OpenCV for processing
@@ -80,32 +86,24 @@ int main(int argc, char** argv) {
 
     createTrackbar("Gaussian Blur sigma", "Settings", &g_sigma, 100, NULL);
     createTrackbar("Gaussian Blur size", "Settings", &g_size, 100, NULL);
-    createTrackbar("Min size", "Settings", &min_size, 10000, NULL);
-    createTrackbar("Max size", "Settings", &max_size, 10000, NULL);
-    createTrackbar("Min Inertia", "Settings", &min_inert, 1000, NULL);
-    createTrackbar("Max Inertia", "Settings", &max_inert, 1000, NULL);
-    createTrackbar("Min Threshold", "Settings", &min_thres, 1000, NULL);
-    createTrackbar("Max Threshold", "Settings", &max_thres, 1000, NULL);
-    createTrackbar("Min Circularity", "Settings", &min_circ, 1000, NULL);
-    createTrackbar("Max Circularity", "Settings", &max_circ, 1000, NULL);
+    createTrackbar("FAST threshold", "Settings", &f_threshold, 255, NULL);
+    createTrackbar("Max good distance", "Settings", &maxGoodDistance, 100000, NULL);
 
-
+    rect_img = imread("/home/ras25/junk/rect.png", 0);
+    Mat rect_mask;
+    Mat rect_mask_after;
+    std::vector<KeyPoint> keypoints;
+    orb.detect(rect_img, keypoints);
+    drawKeypoints( rect_img, keypoints, rect_mask, Scalar::all(-1), DrawMatchesFlags::DEFAULT );
+    imshow("Before", rect_mask);
+    std::cout << "Keypoints: " << keypoints.size() <<"\n";
+    Mat rect_descriptor;
+    extractor.compute(rect_img, keypoints, rect_descriptor);
+    rect_descriptor.convertTo(rect_descriptor, CV_32F);
+    drawKeypoints( rect_img, keypoints, rect_mask_after, Scalar::all(-1), DrawMatchesFlags::DEFAULT );
+    imshow("After", rect_mask_after);
     while(ros::ok()) {
         ros::spinOnce();
-
-        params.filterByColor = true;
-        //params.blobColor = col_fil;
-        params.filterByArea = true;
-        params.minArea = min_size + 100;
-        params.maxArea = max_size + 100;
-        params.filterByInertia = true;
-        params.minInertiaRatio  = (float) min_inert/1000.0;
-        params.maxInertiaRatio  = (float) max_inert/1000.0;
-        params.minThreshold = min_thres;
-        params.maxThreshold = max_thres;
-        params.minCircularity = (float) min_circ/1000.0;
-        params.maxCircularity = (float) max_circ/1000.0;
-        RNG rng(12345);
         // Detect blobs.
         if(imgSet) {
             vector<vector<Point> > contours;
@@ -121,12 +119,66 @@ int main(int argc, char** argv) {
             }
             for( int i = 0; i< contours.size(); i++ )
             {
-                Scalar color = Scalar( rng.uniform(0, 255), rng.uniform(0,255), rng.uniform(0,255) );
-                rectangle( img, boundRect[i].tl(), boundRect[i].br(), color, 2, 8, 0 );
-                imshow("Obj " + i, img(boundRect[i]));
+                //Scalar color = Scalar( rng.uniform(0, 255), rng.uniform(0,255), rng.uniform(0,255) );
+                //rectangle( img, boundRect[i].tl(), boundRect[i].br(), color, 2, 8, 0 );
+                if(boundRect[i].size().width > 50 && boundRect[i].size().height > 50) {
+                    Mat rectImg;
+                    cvtColor(img(boundRect[i]), rectImg, COLOR_BGR2GRAY);
+                    imshow("colorImg", rectImg);
+                    Mat grad;
+                    Mat grad_x;
+                    Mat grad_y;
+                    Mat abs_grad_x;
+                    Mat abs_grad_y;
+                    Sobel( rectImg, grad_x, ddepth, 1, 0, 3, scale, delta, BORDER_DEFAULT );
+                    convertScaleAbs( grad_x, abs_grad_x );
+
+                    /// Gradient Y
+                    //Scharr( src_gray, grad_y, ddepth, 0, 1, scale, delta, BORDER_DEFAULT );
+                    Sobel( rectImg, grad_y, ddepth, 0, 1, 3, scale, delta, BORDER_DEFAULT );
+                    convertScaleAbs( grad_y, abs_grad_y );
+
+                    /// Total Gradient (approximate)
+                    addWeighted( abs_grad_x, 0.5, abs_grad_y, 0.5, 0, grad );
+                    imshow("grad", grad);
+                    std::vector<KeyPoint> keypoints_2;
+                    orb.detect(grad, keypoints_2);
+                    if(keypoints_2.size() > 100) {
+                        Mat rect_descriptor_2;
+                        extractor.compute(grad, keypoints_2, rect_descriptor_2);
+                        rect_descriptor_2.convertTo(rect_descriptor_2, CV_32F);
+                        std::vector< DMatch > matches;
+                        matcher.match( rect_descriptor, rect_descriptor_2, matches );
+                        double max_dist = 0; double min_dist = 100;
+                        for( int i = 0; i < rect_descriptor.rows; i++ )
+                        { double dist = matches[i].distance;
+                          if( dist < min_dist ) min_dist = dist;
+                          if( dist > max_dist ) max_dist = dist;
+                        }
+
+                        std::vector< DMatch > good_matches;
+
+                        for( int i = 0; i < rect_descriptor.rows; i++ )
+                        { if( matches[i].distance <= max(2*(double)maxGoodDistance/1000, 0.02) )
+                          { good_matches.push_back( matches[i]); }
+                        }
+                        std::cout << "Good matches: " << good_matches.size() << "\n";
+                        Mat img_matches;
+                        drawMatches( rect_img, keypoints, grad, keypoints_2,
+                                     good_matches, img_matches, Scalar::all(-1), Scalar::all(-1),
+                                     vector<char>(), DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS );
+
+                        //imwrite( "/home/ras25/junk/rect2.png", grad );
+                        imshow("rect_img", img_matches);
+                    }
+                    else {
+                        std::cout << "Not enough keypoints\n";
+                    }
+
+                    imshow("keypoints", img);
+                    waitKey(3);
+                }
             }
-            imshow("keypoints", img);
-            waitKey(3);
         }
         loop_rate.sleep();
     }
